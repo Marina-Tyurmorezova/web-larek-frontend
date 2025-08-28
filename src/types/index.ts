@@ -1,6 +1,6 @@
 //Интерфейс карточки товара
 interface IProduct {
-    _id: string;
+    id: string;
     category: string;
     title: string;
     image: string;
@@ -14,28 +14,121 @@ interface IBuyer {
     address: string;
     email: string;
     phone: string;
-    getBuyerInfo(data: string): TBuyerInfo; //получение данных покупателя
-    checkValidation(data: Record<keyof TBuyerInfo, string>):boolean; //проверка валидации данные покупателя
-    setBuyerInfo(data: TBuyerInfo):void; //сохранение данных покупателя
 }
 
-//Интерфейс каталога товаров
-interface IProductData {
-    products: IProduct[];
-    preview: string | null; //для выбор конкретного товара по id для просмотра
-    getProductList(products: IProduct[]):IProduct; //получения списка всех карточек товаров
-    getProduct(productId:string):IProduct; //метод получения  конкретного выбранного продукта из каталога для просмотра
+//Класс каталога товаров
+class ProductData {
+    protected products: IProduct[];  // массив объектов товаров
+    protected productItem: IProduct; // один конкретный товар
+    
+   constructor() {
+    this.products = [];
+    this.productItem = null;
+    }
+
+    //получения списка всех карточек товаров
+    getProductList(): IProduct[] { 
+        return this.products;
+    } 
+
+    //сохранение списка карточек
+    setProductList(products:IProduct[]): void {
+        this.products = products;
+    } 
+
+    //метод получения  конкретного выбранного продукта из каталога для просмотра
+    getProduct(productId:string): IProduct | null {
+        return this.products.find(product => product.id === productId) || null;
+    } 
+
+    //метод сохранения одного выбранного продукта
+    setProduct(product:IProduct): void {
+        this.productItem = product;
+    } 
 }
 
-//Интерфес для работы с корзиной товаров
-interface IBasket {
-    chooseProductList: IProduct[];
-    addProduct(productId:string):void; //метод добавления товара в корзину
-    deleteProduct(productId:string):void; //метод удаления товара из корзины
-    showOrderList(chooseProductList: IProduct[]):TBasket; //метод получения списка выбранных товаров
-    countProductItem(chooseProductList: IProduct):number|null; //метод подсчета количества товаров в корзине
-    countTotalAmound(chooseProductList: IProduct):number|null; //метод подсчета итоговой суммы покупок
-    checkAviability():boolean; //метод проверки выбран товар или нет  
+//Класс для работы с корзиной товаров
+class Basket {
+    protected chooseProductList: IProduct[];
+
+    constructor() {
+        this.chooseProductList = [];
+    }
+
+    //метод добавления товара в корзину
+    addProduct(product: IProduct): void {
+        this.chooseProductList.push(product);
+    }
+
+    //метод удаления товара из корзины
+    deleteProduct(productId:string): void {
+        this.chooseProductList = this.chooseProductList.filter(p => p.id !== productId);
+    } 
+
+    //метод получения списка выбранных товаров
+    showOrderList(): IProduct[] {
+        return this.chooseProductList;
+    }
+
+    //метод подсчета количества товаров в корзине
+    countProductItem(): number {
+        return this.chooseProductList.length;
+    }
+
+    //метод подсчета итоговой суммы покупок
+    countTotalAmound(): number {
+        return this.chooseProductList.reduce((sum, product) => sum + (product.price ?? 0), 0);
+    } 
+    //метод проверки выбран товар или нет 
+    checkAviability(productId: string):boolean {
+       return this.chooseProductList.some(product => product.id === productId);
+    };  
+}
+
+
+//Класс для работы с данными покупателя
+class Buyer {
+    protected payment: 'online'|'cash'|''; // два варианта оплаты
+    protected address: string;
+    protected email: string;
+    protected phone: string;
+
+    constructor() {
+        this.payment = '';
+        this.address = '';
+        this.email = '';
+        this.phone = '';
+    }
+
+    //получение данных покупателя
+    getBuyerInfo(): TBuyerInfo {
+        return {
+            payment: this.payment,
+            address: this.address,
+            email: this.email,
+            phone: this.phone
+        };
+    } 
+
+    //проверка валидации данные покупателя
+    checkValidation(data: Record<keyof TBuyerInfo, string>): boolean {
+        if (!data.payment) return false;
+        if (!data.address) return false;
+        if (!data.email.includes('@')) return false;
+        if (!data.phone.match(/^\+?\d+$/)) return false;
+        
+        return true;
+    }
+
+    //сохранение данных покупателя
+    setBuyerInfo(data: TBuyerInfo): void {
+        if (this.checkValidation(data)) {
+            this.payment = data.payment;
+            this.address = data.address;
+            this.email = data.email;
+            this.phone = data.phone;
+        }
+    }
 }
 
  
