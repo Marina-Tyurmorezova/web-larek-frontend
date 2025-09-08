@@ -48,7 +48,7 @@ class ProductData {
 }
 
 //Класс для работы с корзиной товаров
-class Basket {
+class BasketData {
     protected chooseProductList: IProduct[];
 
     constructor() {
@@ -112,10 +112,11 @@ class Buyer {
 
     //проверка валидации данные покупателя
     checkValidation(data: Record<keyof TBuyerInfo, string>): boolean {
-        if (!data.payment) return false;
-        if (!data.address) return false;
-        if (!data.email.includes('@')) return false;
-        if (!data.phone.match(/^\+?\d+$/)) return false;
+       //ToDO: проверить условия валидации
+       // if (!data.payment) return false;
+       // if (!data.address) return false;
+       // if (!data.email.includes('@')) return false;
+       // if (!data.phone.match(/^\+?\d+$/)) return false;
         
         return true;
     }
