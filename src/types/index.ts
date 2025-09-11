@@ -10,7 +10,7 @@ interface IProduct {
 
 //Интерфейс данных покупателя
 interface IBuyer {
-    payment: 'online'|'cash'|''; // два варианта оплаты
+    payment: 'card'|'cash'|''; // два варианта оплаты
     address: string;
     email: string;
     phone: string;
