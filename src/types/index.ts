@@ -26,7 +26,7 @@ export interface IBuyer {
 
 export type TProductPreview = Pick<IProduct, 'category' | 'title' | 'image' | 'price'>;
 export type TProductDetails = Pick<IProduct, 'category' | 'title' | 'image' | 'price' | 'description'> & {buttonText:boolean};
-export type TBuyerInfo = Pick<IBuyer, 'payment' | 'address'| 'email' | 'phone'>& { total: number; items: string[] };
+export type TBuyerInfo = Pick<IBuyer, 'payment' | 'address'| 'email' | 'phone'> & { total: number; items: string[] };
 export type TProductBasket = Pick<IProduct, 'title'|'price'> & { index: number };
 export type FormErrors = Partial<Record<keyof IBuyer, string>>;
 
@@ -41,6 +41,7 @@ export class ProductData {
 
    constructor(events: IEvents) {
     this.events = events;
+	this.productItem = {} as IProduct; // !!!сомнение
     }
 
     getProductList(): IProduct[] { 
@@ -81,22 +82,25 @@ export class BasketData {
     } 
 
     showOrderList(): IProduct[] {
-        return this.chooseProductList;
+       return this.chooseProductList;
     }
 
+	//количество товаров
     countProductItem(): number {
         return this.chooseProductList.length;
     }
 
+	//сумма товаров
     countTotalAmound(): number {
-        return this.chooseProductList.reduce((acc, productItem) => acc + productItem.price, 0);
+        return this.chooseProductList.reduce((acc, item) => acc + item.price, 0);
        
     } 
 
-    checkAviability(productId: string):boolean {
-        	if (this.chooseProductList.find((productItem) => productItem.id === productId)) {
-			return true;
-		} else return false;
+    checkAviability(id: string):boolean {
+      //  	if (this.chooseProductList.find((productItem) => productItem.id === id)) {
+	//		return true;
+	//	} else return false;
+		return this.chooseProductList.some(product => product.id === id); // !!!
 	
     }
 	
@@ -147,7 +151,7 @@ export class BuyerData {
 	setContactsData(field: keyof IBuyer, value: string) {
 		this.buyer[field] = value;
 		if (this.checkValidationContacts()) {
-			this.events.emit('formCntacts:confirmed');
+			this.events.emit('formCotacts:confirmed');
 		}
 	}
 
@@ -309,7 +313,7 @@ export class Modal extends Component<IModal>{
 //успешное оформление заказа
 interface IOrderSuccess {
 	title: string;
-	description: number;
+	text: number; 
 	button: string;
 }
 
@@ -319,7 +323,7 @@ interface ISuccessEvents {
 
 export class OrderSuccess extends Component<IOrderSuccess>{
     protected _title: HTMLElement;
-	protected _description: HTMLElement;
+	protected _text: HTMLElement;
 	protected _button: HTMLButtonElement;
 
 	constructor(container: HTMLElement, events: ISuccessEvents) {
@@ -329,7 +333,7 @@ export class OrderSuccess extends Component<IOrderSuccess>{
 			'.order-success__title',
 			this.container
 		);
-		this._description = ensureElement<HTMLElement>(
+		this._text = ensureElement<HTMLElement>(
 			'.order-success__description',
 			this.container
 		);
@@ -337,14 +341,18 @@ export class OrderSuccess extends Component<IOrderSuccess>{
 			'.order-success__close',
 			this.container
 		);
+
+		if (events?.onClick) {
+			this._button.addEventListener('click', events.onClick);
+		}
     }
 
     set title(value: string) {
 		this.setText(this._title, value);
 	}
 
-	set description(value: number) {
-		this.setText(this._description, `Списано ${value} синапсов`);
+	set text(value: number) {
+		this.setText(this._text, `Списано ${value} синапсов`);
 	}
 
 	set button(value: string) {
@@ -389,6 +397,14 @@ export class Product<T> extends Component<IProduct>{
 
     get title(): string {
 		return this._title.textContent || '';
+	}
+
+	set price(value: number | null) {
+		if (value === null) {
+			this.setText(this._price, 'Бесценно');
+		} else {
+			this.setText(this._price, `${value} синапсов`);
+		}
 	}
 
     get price(): number|null {
@@ -467,7 +483,7 @@ export class CardFull extends Product<TProductDetails> {
 		}
     }
    
-    set cardButtonText(value:boolean) {
+    set buttonText(value: boolean) {
 		if (this.price === null) {
 			this.setText(this._cardButton, 'Недоступно');
 			this.setDisabled(this._cardButton, true);
@@ -478,18 +494,19 @@ export class CardFull extends Product<TProductDetails> {
 				value ? 'Удалить из корзины' : 'Купить'
 			);
 		}
-    }
+	}
+
 }
 
 //карточка в корзине
 export class CardCompact extends Product<TProductBasket> {
-    protected _itemIndex: HTMLElement;
+    protected _index: HTMLElement;
     protected _deleteBasketButton: HTMLButtonElement;
 
     constructor(container: HTMLElement, events: ICardEvents) {
        super(container);
        
-       this._itemIndex = ensureElement<HTMLElement>(
+       this._index = ensureElement<HTMLElement>(
 			'.basket__item-index',
 			this.container
 		);
@@ -504,8 +521,8 @@ export class CardCompact extends Product<TProductBasket> {
 		}
     }
 
-    set itemIndex(value: number) {
-		this.setText(this._itemIndex, value);
+    set index(value: number) {
+		this.setText(this._index, value);
 	}
 }
 
@@ -545,12 +562,20 @@ export class Basket extends Component<IBasket> {
 			this.container
 		);
 
+		this._basketOrderButton.addEventListener('click', () => {
+			this.events.emit('formOrder:open');
+		});
+
 		this.basketList = [];
     }
 
     set modalTitle(value: string) {
 		this.setText(this._modalTitle, value);
 	}
+
+	set basketOrderButton(value: string) {
+        this.setText(this._basketOrderButton, value);
+    }
 
     set basketList(items: HTMLElement[]) {
 		if (items.length) {
@@ -569,10 +594,6 @@ export class Basket extends Component<IBasket> {
 
     set basketPrice(value: number) {
         this.setText(this._basketPrice, `${value} синапсов`);
-    }
-
-    set basketOrderButton(value: string) {
-        this.setText(this._basketOrderButton, value);
     }
 }
 

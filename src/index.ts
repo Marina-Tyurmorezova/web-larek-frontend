@@ -1,10 +1,14 @@
 import './scss/styles.scss';
+import { API_URL, CDN_URL } from './utils/constants';
+import { cloneTemplate, ensureElement } from './utils/utils';
+import { EventEmitter } from './components/base/events';
 import {
         CommAPI ,
         IBuyer ,
         IProduct ,
         ProductData ,
         BasketData ,
+		TBuyerInfo ,
         BuyerData ,
         Page ,
         Modal ,
@@ -17,10 +21,6 @@ import {
         IFormOrder ,
         FormContacts ,
         IFormContacts} from "./types";
-
-import { EventEmitter } from './components/base/events';
-import { API_URL, CDN_URL } from './utils/constants';
-import { cloneTemplate, ensureElement } from './utils/utils';
 
 const events = new EventEmitter();
 const api = new CommAPI(CDN_URL, API_URL);
@@ -74,7 +74,7 @@ events.on('products:update', () => {
 
 // Обновить корзину товаров
 events.on('basket:update', () => {
-	page.counter = basketData.countTotalAmound();
+	page.counter = basketData.countProductItem();
 
 	const basketItemsList = basketData.showOrderList().map((item, indx) => {
 		const card = new CardCompact(cloneTemplate(cardBasketTemplate), {
@@ -87,6 +87,7 @@ events.on('basket:update', () => {
 	    basketList: basketItemsList,
 		basketPrice: basketData.countTotalAmound(),
 	});
+
 });
 
 events.on('basket:open', () => {
@@ -97,7 +98,7 @@ events.on('basket:open', () => {
 
 events.on('basket:delete', (item: IProduct) => {
 	basketData.deleteProduct(item.id);
-	cardFull.cardButtonText = basketData.checkAviability(item.id);
+	cardFull.buttonText = basketData.checkAviability(item.id);
 });
 
 // Открыть карточку товара
@@ -112,13 +113,14 @@ events.on('card:select', (item: IProduct) => {
 });
 
 // Добавление или удаление товара из корзины
-events.on('card:buy', () => {
+events.on('product:buy', () => {
 	if (basketData.checkAviability(cardFull.id)) {
 		basketData.deleteProduct(cardFull.id);
 	} else {
 		basketData.addProduct(productData.getProduct());
 	}
-	cardFull.cardButtonText = basketData.checkAviability(cardFull.id);
+	cardFull.buttonText = basketData.checkAviability(cardFull.id);
+	console.log(cardFull.id);
 });
 
 // Переход к странице оформления заказа
@@ -135,18 +137,18 @@ events.on('formOrder:open', () => {
 	});
 });
 
-events.on('formOrder.card:selected', () => {
+events.on('order.card:selected', () => {
 	order.isPaymentMethod = 'card';
 	buyerData.setOrderData('payment', 'card');
 });
 
-events.on('formOrder.cash:selected', () => {
+events.on('order.cash:selected', () => {
 	order.isPaymentMethod = 'cash';
 	buyerData.setOrderData('payment', 'cash');
 });
 
 events.on(
-	'formOrder.address:filled',
+	'order.address:filled',
 	(data: { field: keyof IFormOrder; value: string }) => {
 		buyerData.setOrderData('address', data.value);
 	}
@@ -161,7 +163,7 @@ events.on('formErrors.formOrder:filled', (errors: Partial<IBuyer>) => {
 });
 
 // Переход к странице с контактными данными
-events.on('fprmOrder:submit', () => {
+events.on('order:submit', () => {
 	modal.render({
 		content: contacts.render({
 			valid: false,
@@ -175,13 +177,13 @@ events.on('fprmOrder:submit', () => {
 });
 
 events.on(
-	/^contacts\..*:change/,
+	/^contacts\..*:filled/,
 	(data: { field: keyof IFormContacts; value: string }) => {
 		buyerData.setContactsData(data.field, data.value);
 	}
 );
 
-events.on('formErrors.contacts:change', (errors: Partial<IBuyer>) => {
+events.on('formErrors.formContacts:filled', (errors: Partial<IBuyer>) => {
 	const { email, phone } = errors;
 	contacts.valid = !email && !phone;
 	contacts.errors = Object.values({ email, phone })
@@ -190,33 +192,33 @@ events.on('formErrors.contacts:change', (errors: Partial<IBuyer>) => {
 });
 
 // Отправлена форма заказа
-events.on('formContacts:submit', () => {
-	const itemsList = basketData.showOrderList().map((item) => {
-		return item.id;
+events.on('contacts:submit',  () => {
+	const chooseProductList = basketData.showOrderList().map((item) => {
+		return item.id;		
 	});
 	api
 		.placeOrder({
 			...buyerData.getBuyerInfo(),
 			total: basketData.countTotalAmound(),
-			items: itemsList,
+			items: chooseProductList,
 		})
 		.then((result) => {
-			modal.render({ content: success.render({ description: result.description}) }); //проверить
+			modal.render({ content: success.render({text: basketData.countTotalAmound()}) }); 
 			basketData.clearBasket();
 			buyerData.clearBuyerInfo();
-			events.emit('formOrder.success');
+			events.emit('formOrder:success');	
 		})
 		.catch((err) => {
 			console.log(err);
 		});
 });
 
-// Блокируем прокрутку страницы, если открыта модалка
+// Блокируем прокрутку страницы, если открыто модальное окно
 events.on('modal:open', () => {
 	page.locked = true;
 });
 
-// Разблокируем прокрутку страницы, если закрыта модалка
+// Разблокируем прокрутку страницы, если закрыто модальное окно
 events.on('modal:close', () => {
 	page.locked = false;
 });
