@@ -1,13 +1,13 @@
 import { IEvents } from "../components/base/events";
 import { Component } from "../components/base/component";
-import { ensureAllElements, ensureElement } from "../utils/utils";
+import { createElement, ensureAllElements, ensureElement } from "../utils/utils";
 import { CDN_URL } from "../utils/constants";
 import { Api, ApiListResponse } from "../components/base/api";
 
 
 
 //Интерфейс карточки товара
-interface IProduct {
+export interface IProduct {
     id: string;
     category: string;
     title: string;
@@ -17,21 +17,24 @@ interface IProduct {
 }
 
 //Интерфейс данных покупателя
-interface IBuyer {
-    payment: 'card'|'cash'|''; // два варианта оплаты
+export interface IBuyer {
+    payment: string;
     address: string;
     email: string;
     phone: string;
 }
 
-type TProductPreview = Pick<IProduct, 'category' | 'title' | 'image' | 'price'>;
-type TProductDetails = Pick<IProduct, 'category' | 'title' | 'image' | 'price' | 'description'> & {buttonText:boolean};
-type TBuyerInfo = Pick<IBuyer, 'payment' | 'address'| 'email' | 'phone'>& { total: number; items: string[] };
-type TProductBasket = Pick<IProduct, 'title'|'price'>;
+export type TProductPreview = Pick<IProduct, 'category' | 'title' | 'image' | 'price'>;
+export type TProductDetails = Pick<IProduct, 'category' | 'title' | 'image' | 'price' | 'description'> & {buttonText:boolean};
+export type TBuyerInfo = Pick<IBuyer, 'payment' | 'address'| 'email' | 'phone'>& { total: number; items: string[] };
+export type TProductBasket = Pick<IProduct, 'title'|'price'> & { index: number };
+export type FormErrors = Partial<Record<keyof IBuyer, string>>;
+
 
 // ------------СЛОЙ ДАННЫХ---------------
+
 //Класс каталога товаров
-class ProductData {
+export class ProductData {
     protected products: IProduct[] = [];  // массив объектов товаров
     protected productItem: IProduct; // один конкретный товар
     protected events: IEvents;
@@ -59,7 +62,7 @@ class ProductData {
 }
 
 //Класс для работы с корзиной товаров
-class BasketData {
+export class BasketData {
     protected chooseProductList: IProduct[] = [];
     protected events: IEvents;
 
@@ -95,18 +98,24 @@ class BasketData {
 			return true;
 		} else return false;
 	
-    };  
+    }
+	
+	clearBasket() {
+		this.chooseProductList = [];
+		this.events.emit('basket:update');
+	};  
 }
 
 
 //Класс для работы с данными покупателя
-class BuyerData {
+export class BuyerData {
     protected buyer: IBuyer = {
         payment: '',
         address: '',
         email: '' ,
         phone: '' 
-    }
+    };
+	protected formErrors: FormErrors = {};
     protected events: IEvents;
 
     constructor(events: IEvents) {
@@ -117,97 +126,171 @@ class BuyerData {
     getBuyerInfo(): IBuyer {
         return this.buyer;
     } 
+	//очистка данных покупателя
+	clearBuyerInfo(): void {
+		this.buyer = {
+			payment: '',
+			address: '',
+			email: '',
+			phone: '',
+		};
+		this.formErrors = {};
+	}
 
-    //проверка валидации данные покупателя
-    checkValidation(data: Record<keyof TBuyerInfo, string>): boolean {
+	setOrderData(field: keyof IBuyer, value: string) {
+		this.buyer[field] = value;
+			if (this.checkValidationOrder()) {
+			this.events.emit('formOrder:confirmed');
+		}
+	}
+
+	setContactsData(field: keyof IBuyer, value: string) {
+		this.buyer[field] = value;
+		if (this.checkValidationContacts()) {
+			this.events.emit('formCntacts:confirmed');
+		}
+	}
+
+    //проверка валидации данных покупателя на первом этапе оформления
+    checkValidationOrder(){
+		const errors: typeof this.formErrors = {};
+
+		if (!this.buyer.payment) {
+			errors.payment = 'Необходимо выбрать способ оплаты';
+		}
+		if (!this.buyer.address) {
+			errors.address = 'Необходимо указать адрес';
+		}
+
+		this.formErrors = errors;
+		this.events.emit('formErrors.formOrder:filled', this.formErrors);
+		return Object.keys(errors).length === 0;
     }
 
-    //сохранение данных покупателя
-    setBuyerInfo(data: TBuyerInfo): void {
-    }
+	//проверка валидации данных покупателя на первом этапе оформления
+	checkValidationContacts(){
+		const errors: typeof this.formErrors = {};
+
+		if (!this.buyer.email) {
+			errors.email = 'Необходимо указать email';
+		}
+		if (!this.buyer.phone) {
+			errors.phone = 'Необходимо указать телефон';
+		}
+
+		this.formErrors = errors;
+		this.events.emit('formErrors.formContacts:filled', this.formErrors);
+		return Object.keys(errors).length === 0;
+	}	
 }
 
 //-----------------СЛОЙ ПРЕДСТАВЛЕНИЯ----------------------
 
-interface IHeader {
-    counter: number;
+//для работы со всей страницей
+interface IPage {
+	locked: boolean;
+	counter: number;
+	catalog: HTMLElement[];
 }
 
-class Header  extends Component<IHeader> {
-    protected basketButton: HTMLButtonElement;
+export class Page extends Component<IPage> {
+	protected wrapper: HTMLElement;
+	protected basketButton: HTMLButtonElement;
     protected counterElement: HTMLElement;
+	protected catalogItems: HTMLElement;
 
-    constructor(container: HTMLElement, protected events: IEvents) {
-        super(container);
+	constructor(container: HTMLElement, protected events: IEvents) {
+		super(container);
+	
+	this.wrapper = ensureElement<HTMLElement>('.page__wrapper', this.container);
 
-        this.basketButton = ensureElement <HTMLButtonElement>(
+	this.basketButton = ensureElement <HTMLButtonElement>(
 			'.header__basket',
 			this.container
         );
-        this.counterElement = ensureElement<HTMLElement>(
+    
+	this.counterElement = ensureElement<HTMLElement>(
 			'.header__basket-counter',
             this.container
 		);
-        this.basketButton.addEventListener('click', () => {
-			this.events.emit('basket:open');
+
+    this.basketButton.addEventListener('click', () => {
+		this.events.emit('basket:open');
 		});
-    }
-    set counter(value: number) {
-		this.setText(this.counterElement, value);
-	}
 
-}
-
-interface IGallery {
-    catalog: HTMLElement[];
-}
-
-class Gallery extends Component<IGallery> {
-    protected catalogItems: HTMLElement;
-
-    constructor(container: HTMLElement, protected events: IEvents) {
-        super(container);
-
-    this.catalogItems = ensureElement<HTMLElement>(
+	this.catalogItems = ensureElement<HTMLElement>(
 			'.gallery',
 			this.container
 		);
-    }
+	}
+
+	set locked(value: boolean) {
+		if (value) {
+			this.wrapper.classList.add('page__wrapper_locked');
+		} else {
+			this.wrapper.classList.remove('page__wrapper_locked');
+		}
+	}
+
+	set counter(value: number) {
+		this.setText(this.counterElement, value);
+	}
 
     set catalog(items: HTMLElement[]) {
 		this.catalogItems.replaceChildren(...items);
 	}
 }
 
+// модальное окно
 interface IModal {
     content: HTMLElement;
 }
 
-class Modal extends Component<IModal>{
+export class Modal extends Component<IModal>{
     protected _closeButton: HTMLButtonElement;
     protected _content: HTMLElement;
 
-    constructor(container: HTMLElement, events: IEvents) {
+    constructor(container: HTMLElement, protected events: IEvents) {
         super(container);
 
     this._content = ensureElement<HTMLElement>(
 			'.modal__content',
 			this.container
 		);
+
 	this._closeButton = ensureElement<HTMLButtonElement>(
-			'.modal__close',
+			'.modal__close',	
 			this.container
 		);
-    }
 
+	this._closeButton.addEventListener('click', this.close.bind(this));
+
+	this.container.addEventListener('mousedown', (event) => {
+		if (event.target === event.currentTarget) {
+			this.close();
+		}
+	});
+
+	this._content.addEventListener('click', (event) => event.stopPropagation());
+	
+	this.handleEscUp = this.handleEscUp.bind(this);
+	}
+    
     set content(value: HTMLElement) {
 		this._content.replaceChildren(value);
 	}
 
     open() {
+		this.container.classList.add('modal_active');
+		this.events.emit('modal:open');
+		document.addEventListener('keyup', this.handleEscUp);
 	}
 
 	close() {
+		this.container.classList.remove('modal_active');
+		this.content = null;
+		this.events.emit('modal:close');
+		document.removeEventListener('keyup', this.handleEscUp);
 	}
 
 	render(data: IModal): HTMLElement {
@@ -215,20 +298,31 @@ class Modal extends Component<IModal>{
 		this.open();
 		return this.container;
 	}
+
+	handleEscUp(event: KeyboardEvent) {
+		if (event.key === 'Escape') {
+			this.close();
+		}
+	}
 }
 
+//успешное оформление заказа
 interface IOrderSuccess {
 	title: string;
 	description: number;
 	button: string;
 }
 
-class OrderSuccess extends Component<IOrderSuccess>{
+interface ISuccessEvents {
+	onClick: () => void;
+}
+
+export class OrderSuccess extends Component<IOrderSuccess>{
     protected _title: HTMLElement;
 	protected _description: HTMLElement;
 	protected _button: HTMLButtonElement;
 
-	constructor(container: HTMLElement, events: IEvents) {
+	constructor(container: HTMLElement, events: ISuccessEvents) {
 		super(container);
 
 		this._title = ensureElement<HTMLElement>(
@@ -258,7 +352,20 @@ class OrderSuccess extends Component<IOrderSuccess>{
 	}
 }
 
-class Product<T> extends Component<IProduct>{
+
+// Категории товаров
+export const categoryList: Record<string, string> = {
+	'софт-скил': 'card__category_soft',
+	'хард-скил': 'card__category_hard',
+	'другое': 'card__category_other',
+	'дополнительное': 'card__category_additional',
+	'кнопка': 'card__category_button',	
+};
+
+export type categoryKey = keyof typeof categoryList;
+
+//товар
+export class Product<T> extends Component<IProduct>{
     protected _title: HTMLElement;
 	protected _price: HTMLElement;
     protected _id: string;
@@ -285,7 +392,8 @@ class Product<T> extends Component<IProduct>{
 	}
 
     get price(): number|null {
-        return
+        const text = this._price.textContent;
+		return text === 'Бесценно' ? null : parseInt(text);
     }
 
     set image(value: string) {
@@ -294,6 +402,14 @@ class Product<T> extends Component<IProduct>{
 
     set category(value: string) {
 		this.setText(this._category, value);
+		if (this._category) {
+			for (const key in categoryList) {
+				this._category.classList.toggle(
+					categoryList[key as categoryKey],
+					key === value
+				);
+			}
+		}
     }
 
     set description(value: string) {
@@ -307,48 +423,85 @@ class Product<T> extends Component<IProduct>{
 	get id(): string {
 		return this._id;
 	}
+
+	render(data: Partial<T> & Partial<IProduct>) {
+		const { title, price, ...other } = data;
+		super.render({ title, price });
+		Object.assign(this, other);
+		return this.container;
+	}
 }
 
-class CardCatalog extends Product<TProductPreview> {
-    constructor(container: HTMLElement, events?: IEvents){
+interface ICardEvents {
+	onCardClick?: (event: MouseEvent) => void;
+	onButtonClick?: (event: MouseEvent) => void;
+	onDeleteClick?: (event: MouseEvent) => void;
+}
+
+//карточка в каталоге товаров (галереее товаров)
+export class CardCatalog extends Product<TProductPreview> {
+    constructor(container: HTMLElement, events?: ICardEvents){
         super(container);
+
+		if (events?.onCardClick) {
+			this.container.addEventListener('click', events.onCardClick);
+		}
     }
 }
 
-class CardFull extends Product<TProductDetails> {
+//карточка с полной информацией о товаре
+export class CardFull extends Product<TProductDetails> {
     protected _cardButton: HTMLButtonElement;
 	protected _inBasket: boolean = false;
 
-	constructor(container: HTMLElement, events?: IEvents) {
+	constructor(container: HTMLElement, events?: ICardEvents) {
 		super(container);
 
 		this._cardButton = ensureElement<HTMLButtonElement>(
 			'.card__button',
 			this.container
 		);
+
+		if (events?.onButtonClick) {
+			this._cardButton.addEventListener('click', events.onButtonClick);
+		}
     }
    
     set cardButtonText(value:boolean) {
-
+		if (this.price === null) {
+			this.setText(this._cardButton, 'Недоступно');
+			this.setDisabled(this._cardButton, true);
+		} else {
+			this.setDisabled(this._cardButton, false);
+			this.setText(
+				this._cardButton,
+				value ? 'Удалить из корзины' : 'Купить'
+			);
+		}
     }
 }
 
-
-class CardCompact extends Product<TProductBasket> {
+//карточка в корзине
+export class CardCompact extends Product<TProductBasket> {
     protected _itemIndex: HTMLElement;
     protected _deleteBasketButton: HTMLButtonElement;
 
-    constructor(container: HTMLElement, events: IEvents) {
+    constructor(container: HTMLElement, events: ICardEvents) {
        super(container);
        
        this._itemIndex = ensureElement<HTMLElement>(
 			'.basket__item-index',
 			this.container
 		);
+
 		this._deleteBasketButton = ensureElement<HTMLButtonElement>(
 			'.basket__item-delete',
 			this.container
 		);
+
+		if (events?.onDeleteClick) {
+			this._deleteBasketButton.addEventListener('click', events.onDeleteClick);
+		}
     }
 
     set itemIndex(value: number) {
@@ -356,6 +509,8 @@ class CardCompact extends Product<TProductBasket> {
 	}
 }
 
+
+//Корзина
 interface IBasket {
     modalTitle: string;
 	basketOrderButton: string;
@@ -363,13 +518,13 @@ interface IBasket {
 	basketPrice: number;
 }
 
-class Basket extends Component<IBasket> {
+export class Basket extends Component<IBasket> {
     protected _modalTitle: HTMLElement;
 	protected _basketOrderButton: HTMLButtonElement;
 	protected _basketList: HTMLElement;
 	protected _basketPrice: HTMLElement;
 
-    constructor(container: HTMLElement, events: IEvents){
+    constructor(container: HTMLElement, protected events: IEvents){
         super(container);
 
         this._modalTitle = ensureElement<HTMLElement>(
@@ -389,6 +544,8 @@ class Basket extends Component<IBasket> {
 			'.basket__price',
 			this.container
 		);
+
+		this.basketList = [];
     }
 
     set modalTitle(value: string) {
@@ -396,7 +553,18 @@ class Basket extends Component<IBasket> {
 	}
 
     set basketList(items: HTMLElement[]) {
-
+		if (items.length) {
+			this._basketList.replaceChildren(...items);
+			this.setDisabled(this._basketOrderButton, false);
+		} else {
+			this._basketList.replaceChildren(
+				createElement<HTMLParagraphElement>('p', {
+					textContent: 'Корзина пуста',
+					style: 'opacity: 0.3;',
+				})
+			);
+			this.setDisabled(this._basketOrderButton, true);
+		}
     }
 
     set basketPrice(value: number) {
@@ -408,6 +576,7 @@ class Basket extends Component<IBasket> {
     }
 }
 
+//Формы в модальном окне
 interface IForm {
     modalFormTitles: string[];
 	submitButton: string;
@@ -415,7 +584,7 @@ interface IForm {
 	errors: string[];	
 }
 
-class Form<T> extends Component<IForm> {
+export class Form<T> extends Component<IForm> {
     protected _modalFormTitles: HTMLElement[];
 	protected _submitButton: HTMLButtonElement;
 	protected _errors: HTMLElement;
@@ -432,7 +601,20 @@ class Form<T> extends Component<IForm> {
 			'button[type=submit]',
 			this.container
 		);
+
 		this._errors = ensureElement<HTMLElement>('.form__errors', this.container);
+
+		this.container.addEventListener('input', (e: Event) => {
+			const target = e.target as HTMLInputElement;
+			const field = target.name as keyof T;
+			const value = target.value;
+			this.onInputUpdate(field, value);
+		});
+
+		this.container.addEventListener('submit', (e: Event) => {
+			e.preventDefault();
+			this.events.emit(`${this.container.name}:submit`);
+		});
     }
 
     set modalFormTitles(value: string[]) {
@@ -452,15 +634,30 @@ class Form<T> extends Component<IForm> {
 	set errors(value: string) {
 		this.setText(this._errors, value);
 	}
+
+	protected onInputUpdate(field: keyof T, value: string) {
+		this.events.emit(`${this.container.name}.${String(field)}:filled`, {
+			field,
+			value,
+		});
+	}
+
+	render(data: Partial<T> & IForm) {
+		const { modalFormTitles, submitButton, valid, errors, ...inputs } = data;
+		super.render({ modalFormTitles, submitButton, valid, errors });
+		Object.assign(this, inputs);
+		return this.container;
+	}
 }
 
-interface IFormOrder {
+//форма первого этапа оформления заказа
+export interface IFormOrder {
 	payButtons: string[];
 	address: string;
 	isPaymentMethod: 'card' | 'cash';
 }
 
-class FormOrder extends Form<IFormOrder>{
+export class FormOrder extends Form<IFormOrder>{
     protected _payButtons: HTMLButtonElement[];
 	protected _isPaymentMethod: string | null = null;
 
@@ -471,6 +668,12 @@ class FormOrder extends Form<IFormOrder>{
 			'button[type=button]',
 			this.container
 		);
+
+		this._payButtons.forEach((btn) => {
+			btn.addEventListener('click', () => {
+				this.events.emit(`${this.container.name}.${btn.name}:selected`);
+			});
+		});
     }
 
     set payButtons(value: string[]) {
@@ -493,12 +696,13 @@ class FormOrder extends Form<IFormOrder>{
 	}	
 }
 
-interface IFormContacts {
+//форма второго этапа оформления заказа
+export interface IFormContacts {
 	email: string;
 	phone: string;
 }
 
-class FormContacts extends Form<IFormContacts>{
+export class FormContacts extends Form<IFormContacts>{
     constructor(container: HTMLFormElement, events: IEvents) {
 		super(container, events);
 	}
@@ -522,7 +726,7 @@ interface ICommAPI {
 	placeOrder(order: TBuyerInfo): Promise<IOrderSuccess>;
 }
 
-class CommAPI extends Api implements ICommAPI {
+export class CommAPI extends Api implements ICommAPI {
 	readonly cdn: string;
 
 	constructor(cdn: string, baseUrl: string, options?: RequestInit) {
