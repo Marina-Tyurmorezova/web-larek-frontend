@@ -1,26 +1,30 @@
 import './scss/styles.scss';
+
 import { API_URL, CDN_URL } from './utils/constants';
 import { cloneTemplate, ensureElement } from './utils/utils';
+
 import { EventEmitter } from './components/base/events';
-import {
-        CommAPI ,
-        IBuyer ,
-        IProduct ,
-        ProductData ,
-        BasketData ,
-		TBuyerInfo ,
-        BuyerData ,
-        Page ,
-        Modal ,
-        OrderSuccess ,
-        CardCatalog ,
-        CardFull ,
-        CardCompact ,
-        Basket ,
-        FormOrder ,
-        IFormOrder ,
-        FormContacts ,
-        IFormContacts} from "./types";
+
+import { IProduct, IBuyer } from './types';
+
+import { CommAPI } from './components/CommAPI';
+
+import { ProductData } from './components/model/ProductData';
+import { BasketData } from './components/model/BasketData';
+import { BuyerData } from './components/model/BuyerData';
+
+import { Page } from './components/view/Page';
+import { Modal } from './components/view/Modal';
+import { Basket } from './components/view/Basket';
+import { FormOrder , IFormOrder} from './components/view/FormOrder';
+import { FormContacts , IFormContacts } from './components/view/FormContacts';
+
+import { CardFull } from './components/view/CardFull';
+import { CardCompact } from './components/view/CardCompact';
+import { CardCatalog } from './components/view/CardCatalog';
+
+import { OrderSuccess } from './components/view/OrderSuccess';
+
 
 const events = new EventEmitter();
 const api = new CommAPI(CDN_URL, API_URL);

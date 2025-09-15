@@ -6,6 +6,8 @@
 - src/ — исходные файлы проекта
 - src/components/ — папка с JS компонентами
 - src/components/base/ — папка с базовым кодом
+- src/components/model/ - папка с моделями для работы с данными
+- src/components/view/ - папка с элементами слоя представления
 
 Важные файлы:
 - src/pages/index.html — HTML-файл главной страницы
@@ -14,6 +16,8 @@
 - src/scss/styles.scss — корневой файл стилей
 - src/utils/constants.ts — файл с константами
 - src/utils/utils.ts — файл с утилитами
+- src/components/CommAPI.ts - файл слоя коммуникации 
+
 
 ## Установка и запуск
 Для установки и запуска проекта необходимо выполнить команды
