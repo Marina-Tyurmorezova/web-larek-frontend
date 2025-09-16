@@ -11,7 +11,7 @@ export class BasketData {
     }
 
     addProduct(product: IProduct) {
-        this.chooseProductList = [...this.chooseProductList, product];
+        this.chooseProductList.push(product);
         this.events.emit('basket:update');
     }
 

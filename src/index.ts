@@ -53,14 +53,13 @@ const contacts = new FormContacts(cloneTemplate(contactsTemplate), events);
 
 const cardFull = new CardFull(cloneTemplate(cardFullTemplate), {
 	onButtonClick: () => {
-		events.emit('product:buy');
+		events.emit('cardButton:check');
 	},
 });
 
 const success = new OrderSuccess(cloneTemplate(successTemplate), {
 	onClick: () => {
 		modal.close();
-		events.emit('formOrder.success');
 	},
 });
 
@@ -91,7 +90,6 @@ events.on('basket:update', () => {
 	    basketList: basketItemsList,
 		basketPrice: basketData.countTotalAmound(),
 	});
-
 });
 
 events.on('basket:open', () => {
@@ -102,7 +100,8 @@ events.on('basket:open', () => {
 
 events.on('basket:delete', (item: IProduct) => {
 	basketData.deleteProduct(item.id);
-	cardFull.buttonText = basketData.checkAviability(item.id);
+	//вызываем событие изменения текста кнопки
+	events.emit('cardButton:rename');
 });
 
 // Открыть карточку товара
@@ -116,16 +115,33 @@ events.on('card:select', (item: IProduct) => {
 	productData.setProduct(item);
 });
 
-// Добавление или удаление товара из корзины
-events.on('product:buy', () => {
-	if (basketData.checkAviability(cardFull.id)) {
-		basketData.deleteProduct(cardFull.id);
-	} else {
-		basketData.addProduct(productData.getProduct());
-	}
-	cardFull.buttonText = basketData.checkAviability(cardFull.id);
-	console.log(cardFull.id);
+// Проверка статуса товара по клику на кнопке в карточке товара 
+events.on('cardButton:check', () => {
+    // Проверяем наличие товара в корзине
+    if (basketData.checkAviability(cardFull.id)) {
+        events.emit('product:remove');
+    } else {
+        events.emit('product:buy');
+    }
+	// вызываем событие изменения текста кнопки
+	events.emit('cardButton:rename');
 });
+
+// Событие изменения наименования кнопки
+events.on('cardButton:rename', () => {
+	cardFull.buttonText = basketData.checkAviability(cardFull.id);
+})
+
+// Событие добавления товара в корзину
+events.on('product:buy', () => {
+    basketData.addProduct(productData.getProduct());
+});
+
+// Событие удаления товара из корзины в модалке карточки
+events.on('product:remove', () => {
+    basketData.deleteProduct(cardFull.id);
+});
+
 
 // Переход к странице оформления заказа
 events.on('formOrder:open', () => {
